@@ -15,9 +15,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Set working directory
 WORKDIR /app
 
-# Copy and install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Step 1: Install all packages except facenet-pytorch
+# facenet-pytorch 2.6.0 has a strict Pillow<10.3.0 constraint that conflicts
+# when resolved together with torch/torchvision, so we install it last with --no-deps.
+RUN pip install --no-cache-dir \
+    fastapi==0.111.0 \
+    "uvicorn[standard]==0.29.0" \
+    python-multipart==0.0.9 \
+    opencv-python-headless==4.9.0.80 \
+    "numpy>=1.24.0,<2.0.0" \
+    "Pillow>=10.2.0,<10.3.0" \
+    torch==2.3.0 \
+    torchvision==0.18.0 \
+    mediapipe==0.10.14
+
+# Step 2: Install facenet-pytorch skipping its conflicting dep declarations
+RUN pip install --no-cache-dir --no-deps facenet-pytorch==2.6.0
 
 # Copy application code
 COPY main.py .
