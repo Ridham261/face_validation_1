@@ -1,23 +1,34 @@
 # ============================================================
-# Production Face Validation Engine — Dockerfile
+# Production Face Validation Engine — Optimized Dockerfile
 # ============================================================
+
 FROM python:3.10-slim
 
-# Install system dependencies required by OpenCV and MediaPipe
+# Prevent python from writing .pyc files
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Install minimal system dependencies for OpenCV & MediaPipe
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
-    libxrender-dev \
+    libxrender1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
 WORKDIR /app
 
-# Step 1: Install all packages except facenet-pytorch
-# facenet-pytorch 2.6.0 has a strict Pillow<10.3.0 constraint that conflicts
-# when resolved together with torch/torchvision, so we install it last with --no-deps.
+# Upgrade pip first
+RUN pip install --no-cache-dir --upgrade pip
+
+# Install CPU-only PyTorch (VERY IMPORTANT for Render)
+RUN pip install --no-cache-dir \
+    torch==2.3.0+cpu \
+    torchvision==0.18.0+cpu \
+    --extra-index-url https://download.pytorch.org/whl/cpu
+
+# Install remaining dependencies
 RUN pip install --no-cache-dir \
     fastapi==0.111.0 \
     "uvicorn[standard]==0.29.0" \
@@ -25,14 +36,11 @@ RUN pip install --no-cache-dir \
     opencv-python-headless==4.9.0.80 \
     "numpy>=1.24.0,<2.0.0" \
     "Pillow>=10.2.0,<10.3.0" \
-    torch==2.3.0 \
-    torchvision==0.18.0 \
-    mediapipe==0.10.14
+    mediapipe==0.10.14 \
+    requests \
+    facenet-pytorch==2.6.0
 
-# Step 2: Install facenet-pytorch skipping its conflicting dep declarations
-RUN pip install --no-cache-dir --no-deps facenet-pytorch==2.6.0
-
-# Copy application code
+# Copy application
 COPY main.py .
 
 # Create output directories
@@ -45,8 +53,7 @@ RUN mkdir -p detection_outputs/front \
              detection_outputs/no_human \
              detection_outputs/irrelevant
 
-# Expose the API port
 EXPOSE 8000
 
-# Start the application
-CMD ["python", "main.py"]
+# Use uvicorn directly (better for production)
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
