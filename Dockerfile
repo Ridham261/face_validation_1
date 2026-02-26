@@ -1,10 +1,8 @@
+Copy
+
 # ============================================================
 # Production Face Validation Engine — Dockerfile
-# ============================================================
-# Stack: FastAPI + MTCNN (facenet-pytorch) + MediaPipe + OpenCV
-#        + PyTorch (CPU) + aiohttp + pandas
-# Python : 3.10-slim  |  Port: 8000
-# No requirements.txt needed — all deps embedded here.
+# Render.com compatible — no requirements.txt needed
 # ============================================================
 
 FROM python:3.10-slim
@@ -25,22 +23,30 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ── Working directory ────────────────────────────────────────
 WORKDIR /app
 
-# ── Python dependencies (no requirements.txt needed) ─────────
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir \
-        torch==2.2.2 torchvision==0.17.2 \
-        --index-url https://download.pytorch.org/whl/cpu && \
-    pip install --no-cache-dir \
-        fastapi==0.111.0 \
-        "uvicorn[standard]==0.29.0" \
-        facenet-pytorch==2.6.0 \
-        opencv-python-headless==4.9.0.80 \
-        mediapipe==0.10.14 \
-        Pillow==10.3.0 \
-        numpy==1.26.4 \
-        aiohttp==3.9.5 \
-        pandas==2.2.2 \
-        python-multipart==0.0.9
+# ── Python dependencies ───────────────────────────────────────
+# Step 1: Upgrade pip
+RUN pip install --no-cache-dir --upgrade pip
+
+# Step 2: Install PyTorch CPU (must be separate — uses custom index)
+RUN pip install --no-cache-dir \
+    torch==2.2.2 \
+    torchvision==0.17.2 \
+    --index-url https://download.pytorch.org/whl/cpu
+
+# Step 3: Install all other packages
+# Pillow==10.2.0  ← facenet-pytorch 2.6.0 requires Pillow>=10.2.0,<10.3.0
+# numpy left unpinned ← mediapipe resolves its own numpy requirement
+RUN pip install --no-cache-dir \
+    "Pillow==10.2.0" \
+    "facenet-pytorch==2.6.0" \
+    "fastapi==0.111.0" \
+    "uvicorn[standard]==0.29.0" \
+    "opencv-python-headless==4.9.0.80" \
+    "mediapipe==0.10.14" \
+    "numpy==1.26.4" \
+    "aiohttp==3.9.5" \
+    "pandas==2.2.2" \
+    "python-multipart==0.0.9"
 
 # ── Application code ─────────────────────────────────────────
 COPY main.py .
@@ -58,9 +64,9 @@ RUN mkdir -p \
     detection_outputs/no_landmarks
 
 # ── Temp directory for CSV job outputs ───────────────────────
-RUN mkdir -p /tmp/csv_jobs
+RUN mkdir -p /tmp/csv_jobs && chmod 777 /tmp/csv_jobs
 
-# ── Non-root user (security best practice) ───────────────────
+# ── Non-root user ─────────────────────────────────────────────
 RUN useradd -m -u 1000 appuser && \
     chown -R appuser:appuser /app /tmp/csv_jobs
 USER appuser
