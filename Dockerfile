@@ -3,19 +3,13 @@
 # ============================================================
 # Stack: FastAPI + MTCNN (facenet-pytorch) + MediaPipe + OpenCV
 #        + PyTorch (CPU) + aiohttp + pandas
-# Python : 3.10-slim
-# Port   : 8000
+# Python : 3.10-slim  |  Port: 8000
+# No requirements.txt needed — all deps embedded here.
 # ============================================================
 
 FROM python:3.10-slim
 
 # ── System dependencies ──────────────────────────────────────
-# libgl1 + libglib2.0-0      → OpenCV (cv2)
-# libsm6 + libxext6          → OpenCV display/threading
-# libxrender-dev             → OpenCV rendering
-# libgomp1                   → OpenMP (PyTorch CPU multi-thread)
-# git                        → facenet-pytorch may pull GitHub weights
-# wget + ca-certificates     → model weight downloads at runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
@@ -31,17 +25,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ── Working directory ────────────────────────────────────────
 WORKDIR /app
 
-# ── Python dependencies ──────────────────────────────────────
-# Copy requirements first for Docker layer cache efficiency
-COPY requirements.txt .
-
-# Install PyTorch CPU-only first (smaller image, no CUDA bloat)
-# Then install the rest
+# ── Python dependencies (no requirements.txt needed) ─────────
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir \
         torch==2.2.2 torchvision==0.17.2 \
         --index-url https://download.pytorch.org/whl/cpu && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir \
+        fastapi==0.111.0 \
+        "uvicorn[standard]==0.29.0" \
+        facenet-pytorch==2.6.0 \
+        opencv-python-headless==4.9.0.80 \
+        mediapipe==0.10.14 \
+        Pillow==10.3.0 \
+        numpy==1.26.4 \
+        aiohttp==3.9.5 \
+        pandas==2.2.2 \
+        python-multipart==0.0.9
 
 # ── Application code ─────────────────────────────────────────
 COPY main.py .
